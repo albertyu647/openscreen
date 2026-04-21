@@ -58,7 +58,12 @@ import type {
 	ZoomDepth,
 	ZoomFocusMode,
 } from "./types";
-import { DEFAULT_WEBCAM_SIZE_PRESET, MAX_PLAYBACK_SPEED, SPEED_OPTIONS } from "./types";
+import {
+	DEFAULT_WEBCAM_SIZE_PRESET,
+	MAX_PLAYBACK_SPEED,
+	MIN_PLAYBACK_SPEED,
+	SPEED_OPTIONS,
+} from "./types";
 
 function CustomSpeedInput({
 	value,
@@ -70,37 +75,45 @@ function CustomSpeedInput({
 	onError: () => void;
 }) {
 	const isPreset = SPEED_OPTIONS.some((o) => o.speed === value);
-	const [draft, setDraft] = useState(isPreset ? "" : String(Math.round(value)));
+	const [draft, setDraft] = useState(isPreset ? "" : String(value));
 	const [isFocused, setIsFocused] = useState(false);
 
 	const prevValue = useRef(value);
 	if (!isFocused && prevValue.current !== value) {
 		prevValue.current = value;
-		setDraft(isPreset ? "" : String(Math.round(value)));
+		setDraft(isPreset ? "" : String(value));
 	}
 
 	const handleChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
-			const digits = e.target.value.replace(/\D/g, "");
-			if (digits === "") {
-				setDraft("");
-				return;
-			}
-			const num = Number(digits);
+			const text = e.target.value.replace(/[^0-9.]/g, "");
+			// Allow only one decimal point
+			const parts = text.split(".");
+			const sanitizedText = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : text;
+
+			setDraft(sanitizedText);
+
+			if (sanitizedText === "" || sanitizedText === ".") return;
+
+			const num = Number(sanitizedText);
+			if (Number.isNaN(num)) return;
+
 			if (num > MAX_PLAYBACK_SPEED) {
 				onError();
 				return;
 			}
-			setDraft(digits);
-			if (num >= 1) onChange(num);
+
+			if (num >= MIN_PLAYBACK_SPEED) {
+				onChange(num);
+			}
 		},
 		[onChange, onError],
 	);
 
 	const handleBlur = useCallback(() => {
 		setIsFocused(false);
-		if (!draft || Number(draft) < 1) {
-			setDraft(isPreset ? "" : String(Math.round(value)));
+		if (!draft || Number(draft) < MIN_PLAYBACK_SPEED) {
+			setDraft(isPreset ? "" : String(value));
 		}
 	}, [draft, isPreset, value]);
 
@@ -108,8 +121,7 @@ function CustomSpeedInput({
 		<div className="flex items-center gap-1">
 			<input
 				type="text"
-				inputMode="numeric"
-				pattern="[0-9]*"
+				inputMode="decimal"
 				placeholder="--"
 				value={draft}
 				onFocus={() => setIsFocused(true)}

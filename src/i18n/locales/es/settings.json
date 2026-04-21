@@ -22,7 +22,7 @@
 		"selectRegion": "Selecciona una región de velocidad para ajustar",
 		"deleteRegion": "Eliminar región de velocidad",
 		"customPlaybackSpeed": "Velocidad personalizada",
-		"maxSpeedError": "La velocidad no puede superar 16×"
+		"maxSpeedError": "La velocidad no puede superar 100×"
 	},
 	"trim": {
 		"deleteRegion": "Eliminar región de recorte"

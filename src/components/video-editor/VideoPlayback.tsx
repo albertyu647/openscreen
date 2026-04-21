@@ -1147,8 +1147,13 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 				speedRegions.find(
 					(region) => currentTime * 1000 >= region.startMs && currentTime * 1000 < region.endMs,
 				) ?? null;
-			webcamVideo.playbackRate = activeSpeedRegion ? activeSpeedRegion.speed : 1;
+			const targetSpeed = activeSpeedRegion ? activeSpeedRegion.speed : 1;
 
+			try {
+				webcamVideo.playbackRate = Math.min(Math.max(targetSpeed, 0.0625), 16);
+			} catch (_e) {
+				// ignore
+			}
 			if (!isPlaying) {
 				webcamVideo.pause();
 				if (Math.abs(webcamVideo.currentTime - currentTime) > 0.05) {

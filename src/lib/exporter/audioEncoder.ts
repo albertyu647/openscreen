@@ -341,9 +341,15 @@ export class AudioProcessor {
 					}
 
 					const activeSpeedRegion = this.findActiveSpeedRegion(currentTimeMs, speedRegions);
-					const playbackRate = activeSpeedRegion ? activeSpeedRegion.speed : 1;
-					if (Math.abs(media.playbackRate - playbackRate) > 0.0001) {
-						media.playbackRate = playbackRate;
+					const targetSpeed = activeSpeedRegion ? activeSpeedRegion.speed : 1;
+					// Browser limits audio playbackRate to 16. Higher speeds throw a NotSupportedError
+					const clampedPlaybackRate = Math.min(Math.max(targetSpeed, 0.0625), 16);
+					if (Math.abs(media.playbackRate - clampedPlaybackRate) > 0.0001) {
+						try {
+							media.playbackRate = clampedPlaybackRate;
+						} catch (_e) {
+							// ignore
+						}
 					}
 
 					if (!media.paused && !media.ended) {

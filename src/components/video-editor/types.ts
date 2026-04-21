@@ -190,9 +190,9 @@ export const DEFAULT_CROP_REGION: CropRegion = {
 export type PlaybackSpeed = number;
 
 export const MIN_PLAYBACK_SPEED = 0.1;
-// Anything above 16x causes the playhead to stall during preview
+// Anything above 16x may cause the playhead to stall during preview
 // due to the video decoder not being able to keep up.
-export const MAX_PLAYBACK_SPEED = 16;
+export const MAX_PLAYBACK_SPEED = 100;
 
 export function clampPlaybackSpeed(speed: number): PlaybackSpeed {
 	return Math.round(Math.min(MAX_PLAYBACK_SPEED, Math.max(MIN_PLAYBACK_SPEED, speed)) * 100) / 100;

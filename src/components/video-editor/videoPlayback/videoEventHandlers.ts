@@ -52,8 +52,14 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
 		);
 	};
 
+	let lastTickTime = performance.now();
+
 	function updateTime() {
 		if (!video) return;
+
+		const now = performance.now();
+		const deltaRealTimeMs = now - lastTickTime;
+		lastTickTime = now;
 
 		const currentTimeMs = video.currentTime * 1000;
 		const activeTrimRegion = findActiveTrimRegion(currentTimeMs);
@@ -72,8 +78,46 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
 		} else {
 			// Apply playback speed from active speed region
 			const activeSpeedRegion = findActiveSpeedRegion(currentTimeMs);
-			video.playbackRate = activeSpeedRegion ? activeSpeedRegion.speed : 1;
-			emitTime(video.currentTime);
+			const targetSpeed = activeSpeedRegion ? activeSpeedRegion.speed : 1;
+
+			if (targetSpeed > 16 && !video.paused && !video.ended) {
+				// TIMELAPSE MODE:
+				// Browser can't handle playbackRate > 16.
+				// We move the playhead manually and jump the video occasionally.
+
+				// 1. Calculate the new "Virtual" time
+				const videoDeltaMs = deltaRealTimeMs * targetSpeed;
+				const nextTime = video.currentTime + videoDeltaMs / 1000;
+
+				if (nextTime >= video.duration) {
+					video.currentTime = video.duration;
+					emitTime(video.duration);
+					video.pause();
+				} else {
+					// 2. Only seek the actual video occasionally (e.g., every 100ms) to create a timelapse effect
+					// and avoid crushing the decoder with 60 seeks per second.
+					const lastSeekTime =
+						(video as HTMLVideoElement & { _lastHighSpeedSeek?: number })._lastHighSpeedSeek || 0;
+					if (now - lastSeekTime > 100) {
+						video.currentTime = nextTime;
+						(video as HTMLVideoElement & { _lastHighSpeedSeek?: number })._lastHighSpeedSeek = now;
+					}
+
+					// 3. Always update the playhead smoothly
+					emitTime(nextTime);
+				}
+			} else {
+				// NORMAL MODE: 0.1x to 16x
+				try {
+					const clampedRate = Math.min(Math.max(targetSpeed, 0.0625), 16);
+					if (Math.abs(video.playbackRate - clampedRate) > 0.01) {
+						video.playbackRate = clampedRate;
+					}
+				} catch (_e) {
+					// Fallback for browsers with stricter limits
+				}
+				emitTime(video.currentTime);
+			}
 		}
 
 		if (!video.paused && !video.ended) {
@@ -82,6 +126,7 @@ export function createVideoEventHandlers(params: VideoEventHandlersParams) {
 	}
 
 	const handlePlay = () => {
+		lastTickTime = performance.now();
 		if (isSeekingRef.current) {
 			video.pause();
 			return;
