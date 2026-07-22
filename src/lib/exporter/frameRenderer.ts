@@ -30,7 +30,10 @@ import {
 	adaptiveSmoothFactor,
 	smoothCursorFocus,
 } from "@/components/video-editor/videoPlayback/cursorFollowUtils";
-import { clampFocusToStage as clampFocusToStageUtil } from "@/components/video-editor/videoPlayback/focusUtils";
+import {
+	clampFocusToStage as clampFocusToStageUtil,
+	videoFocusToStageSpace,
+} from "@/components/video-editor/videoPlayback/focusUtils";
 import { findDominantRegion } from "@/components/video-editor/videoPlayback/zoomRegionUtils";
 import {
 	applyZoomTransform,
@@ -545,10 +548,17 @@ export class FrameRenderer {
 	private updateAnimationState(timeMs: number): number {
 		if (!this.cameraContainer || !this.layoutCache) return 0;
 
+		const layout = this.layoutCache;
 		const { region, strength, blendedScale, transition } = findDominantRegion(
 			this.config.zoomRegions,
 			timeMs,
-			{ connectZooms: true, cursorTelemetry: this.config.cursorTelemetry },
+			{
+				connectZooms: true,
+				cursorTelemetry: this.config.cursorTelemetry,
+				// Telemetry is recorded in video space; focus is stage space.
+				mapCursorFocus: (focus) =>
+					videoFocusToStageSpace(focus, layout.stageSize, layout.maskRect, this.config.cropRegion),
+			},
 		);
 
 		const defaultFocus = DEFAULT_FOCUS;

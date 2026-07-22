@@ -36,6 +36,7 @@ import { AnnotationOverlay } from "./AnnotationOverlay";
 import {
 	type AnnotationRegion,
 	type BlurData,
+	DEFAULT_CROP_REGION,
 	type SpeedRegion,
 	type TrimRegion,
 	ZOOM_DEPTH_SCALES,
@@ -52,7 +53,10 @@ import {
 	ZOOM_TRANSLATION_DEADZONE_PX,
 } from "./videoPlayback/constants";
 import { adaptiveSmoothFactor, smoothCursorFocus } from "./videoPlayback/cursorFollowUtils";
-import { clampFocusToStage as clampFocusToStageUtil } from "./videoPlayback/focusUtils";
+import {
+	clampFocusToStage as clampFocusToStageUtil,
+	videoFocusToStageSpace,
+} from "./videoPlayback/focusUtils";
 import { layoutVideoContent as layoutVideoContentUtil } from "./videoPlayback/layoutUtils";
 import { clamp01 } from "./videoPlayback/mathUtils";
 import { updateOverlayIndicator } from "./videoPlayback/overlayUtils";
@@ -210,6 +214,7 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 		const baseScaleRef = useRef(1);
 		const baseOffsetRef = useRef({ x: 0, y: 0 });
 		const baseMaskRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+		const cropRegionRef = useRef(DEFAULT_CROP_REGION);
 		const cropBoundsRef = useRef({ startX: 0, endX: 0, startY: 0, endY: 0 });
 		const maskGraphicsRef = useRef<Graphics | null>(null);
 		const isPlayingRef = useRef(isPlaying);
@@ -510,6 +515,10 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 		useEffect(() => {
 			cursorTelemetryRef.current = cursorTelemetry;
 		}, [cursorTelemetry]);
+
+		useEffect(() => {
+			cropRegionRef.current = cropRegion ?? DEFAULT_CROP_REGION;
+		}, [cropRegion]);
 
 		useEffect(() => {
 			selectedZoomIdRef.current = selectedZoomId;
@@ -921,6 +930,14 @@ const VideoPlayback = forwardRef<VideoPlaybackRef, VideoPlaybackProps>(
 					{
 						connectZooms: true,
 						cursorTelemetry: cursorTelemetryRef.current,
+						// Telemetry is recorded in video space; focus is stage space.
+						mapCursorFocus: (focus) =>
+							videoFocusToStageSpace(
+								focus,
+								stageSizeRef.current,
+								baseMaskRef.current,
+								cropRegionRef.current,
+							),
 					},
 				);
 

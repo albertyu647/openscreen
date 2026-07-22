@@ -239,6 +239,31 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
 					const startMs = Math.max(0, Math.min(rawStart, rawEnd));
 					const endMs = Math.max(startMs + 1, rawEnd);
 
+					// Per-region zoom ease durations are adjustable by dragging the
+					// handles on a timeline zoom item, so they have to survive a
+					// save/load round trip. Mirror the timeline's own constraint:
+					// each is non-negative and the pair cannot exceed the region.
+					const regionDuration = endMs - startMs;
+					// Only reject negatives here. An individual upper clamp would skew
+					// the in/out ratio before the pair check below could preserve it,
+					// and getDurations() already compresses an oversized pair at render.
+					let zoomInDurationMs = isFiniteNumber(region.zoomInDurationMs)
+						? Math.max(0, region.zoomInDurationMs)
+						: undefined;
+					let zoomOutDurationMs = isFiniteNumber(region.zoomOutDurationMs)
+						? Math.max(0, region.zoomOutDurationMs)
+						: undefined;
+					if (
+						zoomInDurationMs !== undefined &&
+						zoomOutDurationMs !== undefined &&
+						zoomInDurationMs + zoomOutDurationMs > regionDuration
+					) {
+						// Preserve their ratio rather than dropping one of them.
+						const scale = regionDuration / (zoomInDurationMs + zoomOutDurationMs);
+						zoomInDurationMs *= scale;
+						zoomOutDurationMs *= scale;
+					}
+
 					return {
 						id: region.id,
 						startMs,
@@ -249,6 +274,8 @@ export function normalizeProjectEditor(editor: Partial<ProjectEditorState>): Pro
 							cy: clamp(isFiniteNumber(region.focus?.cy) ? region.focus.cy : 0.5, 0, 1),
 						},
 						focusMode: region.focusMode === "auto" ? "auto" : "manual",
+						...(zoomInDurationMs !== undefined ? { zoomInDurationMs } : {}),
+						...(zoomOutDurationMs !== undefined ? { zoomOutDurationMs } : {}),
 					};
 				})
 		: [];

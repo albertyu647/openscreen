@@ -110,6 +110,47 @@ export function softenFocusToScale(
 	};
 }
 
+interface RectLike {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * Map a point expressed in source-video space (0-1 across the recording) into
+ * stage space (0-1 across the output canvas, wallpaper included).
+ *
+ * Cursor telemetry is captured relative to the recorded display, but zoom focus
+ * is relative to the canvas — and the video sits inset within that canvas by
+ * the padding setting. Auto-follow has to convert between the two or it aims
+ * short of the cursor by however much padding is in effect.
+ */
+export function videoFocusToStageSpace(
+	focus: ZoomFocus,
+	stageSize: StageSize,
+	screenRect: RectLike,
+	cropRegion?: { x: number; y: number; width: number; height: number },
+): ZoomFocus {
+	if (!stageSize.width || !stageSize.height || !screenRect.width || !screenRect.height) {
+		return focus;
+	}
+
+	// Telemetry covers the whole recording; the stage only shows the cropped part.
+	const cropX = cropRegion?.x ?? 0;
+	const cropY = cropRegion?.y ?? 0;
+	const cropW = cropRegion?.width ?? 1;
+	const cropH = cropRegion?.height ?? 1;
+
+	const croppedX = cropW > 0 ? (focus.cx - cropX) / cropW : focus.cx;
+	const croppedY = cropH > 0 ? (focus.cy - cropY) / cropH : focus.cy;
+
+	return {
+		cx: (screenRect.x + croppedX * screenRect.width) / stageSize.width,
+		cy: (screenRect.y + croppedY * screenRect.height) / stageSize.height,
+	};
+}
+
 export function stageFocusToVideoSpace(
 	focus: ZoomFocus,
 	stageSize: StageSize,

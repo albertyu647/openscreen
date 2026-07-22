@@ -197,3 +197,46 @@ it("detects unsaved changes from differing snapshots", () => {
 	expect(hasProjectUnsavedChanges("same", "same")).toBe(false);
 	expect(hasProjectUnsavedChanges("current", "baseline")).toBe(true);
 });
+
+describe("projectPersistence zoom ease durations", () => {
+	const zoom = (extra: Record<string, unknown>) =>
+		normalizeProjectEditor({
+			zoomRegions: [
+				{
+					id: "zoom-1",
+					startMs: 0,
+					endMs: 4000,
+					depth: 3,
+					focus: { cx: 0.5, cy: 0.5 },
+					...extra,
+				},
+			],
+		} as Parameters<typeof normalizeProjectEditor>[0]).zoomRegions[0];
+
+	it("preserves per-region ease durations across a save/load round trip", () => {
+		const region = zoom({ zoomInDurationMs: 800, zoomOutDurationMs: 400 });
+		expect(region.zoomInDurationMs).toBe(800);
+		expect(region.zoomOutDurationMs).toBe(400);
+	});
+
+	it("leaves durations undefined when the project never set them", () => {
+		const region = zoom({});
+		expect(region.zoomInDurationMs).toBeUndefined();
+		expect(region.zoomOutDurationMs).toBeUndefined();
+	});
+
+	it("clamps negative or non-finite durations", () => {
+		const region = zoom({ zoomInDurationMs: -500, zoomOutDurationMs: Number.NaN });
+		expect(region.zoomInDurationMs).toBe(0);
+		expect(region.zoomOutDurationMs).toBeUndefined();
+	});
+
+	it("scales the pair down proportionally when they exceed the region", () => {
+		const region = zoom({ zoomInDurationMs: 6000, zoomOutDurationMs: 2000 });
+		const total = (region.zoomInDurationMs ?? 0) + (region.zoomOutDurationMs ?? 0);
+		expect(total).toBeLessThanOrEqual(4000);
+		// 3:1 ratio preserved
+		expect(region.zoomInDurationMs).toBeCloseTo(3000, 5);
+		expect(region.zoomOutDurationMs).toBeCloseTo(1000, 5);
+	});
+});
