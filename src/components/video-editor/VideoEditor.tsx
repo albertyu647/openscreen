@@ -1503,12 +1503,23 @@ export default function VideoEditor() {
 						}
 					}
 
+					// Scripted-export override, same escape hatch as __exportFrameRate.
+					const sizeOverride = (window as { __exportSize?: { width: number; height: number } })
+						.__exportSize;
+					if (sizeOverride) {
+						exportWidth = sizeOverride.width;
+						exportHeight = sizeOverride.height;
+					}
+
 					const exporter = new VideoExporter({
 						videoUrl: videoPath,
 						webcamVideoUrl: webcamVideoPath || undefined,
 						width: exportWidth,
 						height: exportHeight,
-						frameRate: 60,
+						// A 30fps capture rendered at 60 composites and encodes every
+						// frame twice without adding source detail. Overridable so
+						// scripted exports can match the capture cadence.
+						frameRate: (window as { __exportFrameRate?: number }).__exportFrameRate ?? 60,
 						bitrate,
 						codec: "avc1.640033",
 						wallpaper,

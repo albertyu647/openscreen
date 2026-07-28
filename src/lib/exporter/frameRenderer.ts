@@ -116,6 +116,12 @@ export class FrameRenderer {
 	private motionBlurFilter: MotionBlurFilter | null = null;
 	private shadowCanvas: HTMLCanvasElement | null = null;
 	private shadowCtx: CanvasRenderingContext2D | null = null;
+	/*
+	 * Caching this shadow across frames with an identical camera pose was tried
+	 * and reverted: on demo footage the camera is easing almost continuously, so
+	 * the cache essentially never hit and the extra composite made it no faster.
+	 * Revisit only for content with long static holds.
+	 */
 	private compositeCanvas: HTMLCanvasElement | null = null;
 	private compositeCtx: CanvasRenderingContext2D | null = null;
 	private rasterCanvas: HTMLCanvasElement | null = null;
@@ -348,6 +354,21 @@ export class FrameRenderer {
 			console.error("[FrameRenderer] Error setting up background, using fallback:", error);
 			bgCtx.fillStyle = "#000000";
 			bgCtx.fillRect(0, 0, this.config.width, this.config.height);
+		}
+
+		// The background never moves and the blur radius is constant, so bake it in
+		// once here rather than re-filtering the full canvas on every frame.
+		if (this.config.showBlur) {
+			const blurred = document.createElement("canvas");
+			blurred.width = this.config.width;
+			blurred.height = this.config.height;
+			const blurredCtx = blurred.getContext("2d");
+			if (blurredCtx) {
+				blurredCtx.filter = "blur(6px)"; // Canvas blur is weaker than CSS
+				blurredCtx.drawImage(bgCanvas, 0, 0, this.config.width, this.config.height);
+				this.backgroundSprite = blurred;
+				return;
+			}
 		}
 
 		// Store the background canvas for compositing
@@ -756,14 +777,8 @@ export class FrameRenderer {
 		if (this.backgroundSprite) {
 			const bgCanvas = this.backgroundSprite;
 
-			if (this.config.showBlur) {
-				ctx.save();
-				ctx.filter = "blur(6px)"; // Canvas blur is weaker than CSS
-				ctx.drawImage(bgCanvas, 0, 0, w, h);
-				ctx.restore();
-			} else {
-				ctx.drawImage(bgCanvas, 0, 0, w, h);
-			}
+			// Already blurred at setup when showBlur is on.
+			ctx.drawImage(bgCanvas, 0, 0, w, h);
 		} else {
 			console.warn("[FrameRenderer] No background sprite found during compositing!");
 		}
@@ -776,8 +791,6 @@ export class FrameRenderer {
 			this.shadowCtx
 		) {
 			const shadowCtx = this.shadowCtx;
-			shadowCtx.clearRect(0, 0, w, h);
-			shadowCtx.save();
 
 			// Calculate shadow parameters based on intensity (0-1)
 			const intensity = this.config.shadowIntensity;
@@ -789,6 +802,8 @@ export class FrameRenderer {
 			const baseAlpha3 = 0.3 * intensity;
 			const baseOffset = 12 * intensity;
 
+			shadowCtx.clearRect(0, 0, w, h);
+			shadowCtx.save();
 			shadowCtx.filter = `drop-shadow(0 ${baseOffset}px ${baseBlur1}px rgba(0,0,0,${baseAlpha1})) drop-shadow(0 ${baseOffset / 3}px ${baseBlur2}px rgba(0,0,0,${baseAlpha2})) drop-shadow(0 ${baseOffset / 6}px ${baseBlur3}px rgba(0,0,0,${baseAlpha3}))`;
 			shadowCtx.drawImage(videoCanvas, 0, 0, w, h);
 			shadowCtx.restore();
