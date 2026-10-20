@@ -1,3 +1,44 @@
+<p align="center">
+  <img src=".github/assets/logo.jpg" width="96" alt="OpenScreen fork logo">
+</p>
+
+<h1 align="center">OpenScreen, autodemo fork</h1>
+
+<p align="center">
+  A fork of <a href="https://github.com/siddharthvaddem/openscreen">OpenScreen</a> with steadier zoom animation, timelapse playback and configurable export, so it can render demo videos headlessly for <a href="https://github.com/albertyu647/autodemo">autodemo</a>.
+</p>
+
+<p align="center">
+  <img src=".github/assets/banner.jpg" alt="A video editor timeline with zoom regions, an easing curve and a zoomed screen frame">
+</p>
+
+## What this fork changes
+
+All changes are on the `autodemo` branch, on top of upstream OpenScreen.
+
+| Change | Why it matters |
+|---|---|
+| **Per-region ease durations are preserved.** `normalizeProjectEditor()` used to drop `zoomInDurationMs` / `zoomOutDurationMs` on every save and load. | A project file can set the timing of each zoom, and the timeline's drag handles stop losing their values. |
+| **No "pop" between chained zooms.** When two zoom regions were close enough to be joined by a pan, the camera fell to 1.0x for about two frames at the handoff. | Back-to-back shots glide from one framing to the next instead of flickering. |
+| **Cursor-follow aims at the pointer.** Auto-focus fed cursor telemetry straight in as a focus value, so it aimed short of the pointer by the padding amount. It now converts video space to stage space itself. | Auto-follow zooms land on what is being clicked. |
+| **Playback up to 100x and a timelapse mode.** | Long waits in a recording can be compressed instead of cut. |
+| **Configurable export frame rate and size, with background blur baked in.** | Renders match the capture exactly, which a scripted pipeline needs. |
+
+The easing curves are untouched. A render with no chained regions is bit-identical before and after these changes (PSNR infinity over 900 frames).
+
+### Using it headlessly
+
+Launch with `HEADLESS=true` to run without a window. [autodemo's `export.mjs`](https://github.com/albertyu647/autodemo/blob/main/scripts/export.mjs) shows how to inject a project and capture the exported video through the main-process IPC handlers.
+
+```sh
+git clone -b autodemo https://github.com/albertyu647/openscreen
+cd openscreen && npm install && npm run build-vite
+```
+
+The original README follows.
+
+---
+
 > [!WARNING]
 > This is very much in beta and might be buggy here and there (but hope you have a good experience!).
 
